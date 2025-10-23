@@ -1,49 +1,12 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bloom Cafe & Restaurant</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"></script>
     <style>
         body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; margin: 0; padding: 0; }
         header { background: #228b22; color: white; padding: 10px; text-align: center; }
@@ -87,7 +50,7 @@
         <h1 id="cafe-name">BLOOM CAFE & RESTAURANT</h1>
         <p id="contact">Contact: 9001160228</p>
         <p id="catchy-line">Taste the Bloom — Come Back Soon!</p>
-        <div id="realtime-status">Local: connected (refresh for updates)</div>
+        <div id="realtime-status">Realtime: connected</div>
     </header>
     <div class="container" id="app"></div>
     <footer>
@@ -96,10 +59,23 @@
     </footer>
 
     <script>
-        // Data Models - localStorage persistence
-        let menuItems = JSON.parse(localStorage.getItem('bloom-menu')) || [];
-        let orders = JSON.parse(localStorage.getItem('bloom-orders')) || [];
-        let settings = JSON.parse(localStorage.getItem('bloom-settings')) || { 
+        // Firebase Configuration (Replace with your full config from Firebase Console)
+        const firebaseConfig = {
+    apiKey: "AIzaSyCY_PYp0VxGmm4d9OuKRqDRkp-ZCOMLRjU",
+    authDomain: "bloom-cafe-7d929.firebaseapp.com",
+    projectId: "bloom-cafe-7d929",
+    storageBucket: "bloom-cafe-7d929.firebasestorage.app",
+    messagingSenderId: "35820544683",
+    appId: "1:35820544683:web:e26dcea6301e4c9a9e8dee",
+    measurementId: "G-JP1R587JCC"
+  };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Data Models
+        let menuItems = [];
+        let orders = [];
+        let settings = { 
             taxRate: 0, 
             passwords: { manager: 'manager', kitchen: 'kitchen' }, 
             cafeName: 'BLOOM CAFE & RESTAURANT', 
@@ -113,82 +89,113 @@
 
         // Seed Menu
         const seedMenu = [
-            {"category": "COLD COFFEE", "name": "Cold Coffee", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": 1},
-            {"category": "COLD COFFEE", "name": "Cold Coffee With Ice Cream", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 2},
-            {"category": "COLD COFFEE", "name": "Cookies Tea / Masala Tea", "price": 49.00, "description": "", "available": true, "imageUrl": "", "id": 3},
-            {"category": "COLD COFFEE", "name": "Black Tea", "price": 39.00, "description": "", "available": true, "imageUrl": "", "id": 4},
-            {"category": "COLD COFFEE", "name": "Hot Coffee", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": 5},
-            {"category": "SHAKE", "name": "Vanila Shake", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": 6},
-            {"category": "SHAKE", "name": "Chocolate Shake", "price": 159.00, "description": "", "available": true, "imageUrl": "", "id": 7},
-            {"category": "SHAKE", "name": "Kit Kat Shake", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 8},
-            {"category": "SHAKE", "name": "Oreo Shake", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": 9},
-            {"category": "SHAKE", "name": "Butter Scotch Shake", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": 10},
-            {"category": "MOCKTAIL", "name": "Sunny Setup", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": 11},
-            {"category": "MOCKTAIL", "name": "Blue Lugan", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": 12},
-            {"category": "MOCKTAIL", "name": "Panch Mel", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 13},
-            {"category": "MOCKTAIL", "name": "Fresh Lemon Soda", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": 14},
-            {"category": "MOCKTAIL", "name": "Virgin Mojito", "price": 139.00, "description": "", "available": true, "imageUrl": "", "id": 15},
-            {"category": "DESERT", "name": "Vanila Ice Cream", "price": 49.00, "description": "", "available": true, "imageUrl": "", "id": 16},
-            {"category": "DESERT", "name": "Butter Scotch Ice Cream", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": 17},
-            {"category": "DESERT", "name": "Chocolate Ice Cream", "price": 69.00, "description": "", "available": true, "imageUrl": "", "id": 18},
-            {"category": "DESERT", "name": "Rosperel Ice Cream", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": 19},
-            {"category": "BURGER", "name": "Veg Burger", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": 20},
-            {"category": "BURGER", "name": "Veg Cheese Burger", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": 21},
-            {"category": "SANDWICH", "name": "Veg Grill Sandwich", "price": 129.00, "description": "", "available": true, "imageUrl": "", "id": 22},
-            {"category": "SANDWICH", "name": "Veg Sandwich & French Fry", "price": 79.00, "description": "", "available": true, "imageUrl": "", "id": 23},
-            {"category": "SANDWICH", "name": "Bombay Sandwich", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": 24},
-            {"category": "SANDWICH", "name": "Chipotle Sandwich", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": 25},
-            {"category": "SANDWICH", "name": "Bread Butter Cheese Sandwich", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": 26},
-            {"category": "SANDWICH", "name": "Paneer Sandwich", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": 27},
-            {"category": "SOUP", "name": "Hot & Sour Soup", "price": 119.00, "description": "", "available": true, "imageUrl": "", "id": 28},
-            {"category": "SOUP", "name": "Manchau Soup", "price": 109.00, "description": "", "available": true, "imageUrl": "", "id": 29},
-            {"category": "SOUP", "name": "Tomato Soup", "price": 129.00, "description": "", "available": true, "imageUrl": "", "id": 30},
-            {"category": "SOUP", "name": "Sweet Corn Soup", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": 31},
-            {"category": "SOUP", "name": "Lemon Coriander Soup", "price": 130.00, "description": "", "available": true, "imageUrl": "", "id": 32},
-            {"category": "SOUP", "name": "Cream Mushroom Soup", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": 33},
-            {"category": "CHINESE", "name": "Paneer Chilli", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": 34},
-            {"category": "CHINESE", "name": "Honey Chilli", "price": 289.00, "description": "", "available": true, "imageUrl": "", "id": 35},
-            {"category": "CHINESE", "name": "Chilli Potato", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": 36},
-            {"category": "CHINESE", "name": "Chilli Mushroom", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": 37},
-            {"category": "CHINESE", "name": "Manchurian Gravy & Dry", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": 38},
-            {"category": "CHINESE", "name": "Noodles", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": 39},
-            {"category": "CHINESE", "name": "Hakka Noodles", "price": 139.00, "description": "", "available": true, "imageUrl": "", "id": 40},
-            {"category": "CHINESE", "name": "Schezwan Noodles", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 41},
-            {"category": "RICE", "name": "Fried Rice", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 42},
-            {"category": "RICE", "name": "Schezwan Rice", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": 43},
-            {"category": "RICE", "name": "Bloom Special Rice", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": 44},
-            {"category": "TANDOOR", "name": "Paneer Tikka", "price": 269.00, "description": "", "available": true, "imageUrl": "", "id": 45},
-            {"category": "TANDOOR", "name": "Achari Paneer Tikka", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": 46},
-            {"category": "TANDOOR", "name": "Malai Paneer Tikka", "price": 299.00, "description": "", "available": true, "imageUrl": "", "id": 47},
-            {"category": "TANDOOR", "name": "Hara Bhara Kabab", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": 48},
-            {"category": "TANDOOR", "name": "Corn Kabab", "price": 219.00, "description": "", "available": true, "imageUrl": "", "id": 49},
-            {"category": "TANDOOR", "name": "Tandoori Soya Chap", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": 50},
-            {"category": "TANDOOR", "name": "Aacharya Soya Chap", "price": 209.00, "description": "", "available": true, "imageUrl": "", "id": 51},
-            {"category": "TANDOOR", "name": "Malai Soya Chap", "price": 259.00, "description": "", "available": true, "imageUrl": "", "id": 52},
-            {"category": "PIZZA", "name": "Veg Pizza (B / S) - Big", "price": 229.00, "description": "", "available": true, "imageUrl": "", "id": 53},
-            {"category": "PIZZA", "name": "Veg Pizza (B / S) - Small", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 54},
-            {"category": "PIZZA", "name": "Margaret Pizza (B / S) - Big", "price": 270.00, "description": "", "available": true, "imageUrl": "", "id": 55},
-            {"category": "PIZZA", "name": "Margaret Pizza (B / S) - Small", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 56},
-            {"category": "PIZZA", "name": "Paneer Tikka Pizza (B / S) - Big", "price": 249.00, "description": "", "available": true, "imageUrl": "", "id": 57},
-            {"category": "PIZZA", "name": "Paneer Tikka Pizza (B / S) - Small", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": 58},
-            {"category": "PIZZA", "name": "Farm House Pizza (B / S) - Big", "price": 279.00, "description": "", "available": true, "imageUrl": "", "id": 59},
-            {"category": "PIZZA", "name": "Farm House Pizza (B / S) - Small", "price": 209.00, "description": "", "available": true, "imageUrl": "", "id": 60},
-            {"category": "PASTA", "name": "Pasto Pasta", "price": 249.00, "description": "", "available": true, "imageUrl": "", "id": 61},
-            {"category": "PASTA", "name": "White Sauce Pasta", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": 62},
-            {"category": "PASTA", "name": "Red Sauce Pasta", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": 63},
-            {"category": "SMOOTHIE", "name": "Sun Ban Smoothie", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": 64},
-            {"category": "SMOOTHIE", "name": "Hang Over Smoothie", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": 65}
+            {"category": "COLD COFFEE", "name": "Cold Coffee", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "1"},
+            {"category": "COLD COFFEE", "name": "Cold Coffee With Ice Cream", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "2"},
+            {"category": "COLD COFFEE", "name": "Cookies Tea / Masala Tea", "price": 49.00, "description": "", "available": true, "imageUrl": "", "id": "3"},
+            {"category": "COLD COFFEE", "name": "Black Tea", "price": 39.00, "description": "", "available": true, "imageUrl": "", "id": "4"},
+            {"category": "COLD COFFEE", "name": "Hot Coffee", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "5"},
+            {"category": "SHAKE", "name": "Vanila Shake", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "6"},
+            {"category": "SHAKE", "name": "Chocolate Shake", "price": 159.00, "description": "", "available": true, "imageUrl": "", "id": "7"},
+            {"category": "SHAKE", "name": "Kit Kat Shake", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "8"},
+            {"category": "SHAKE", "name": "Oreo Shake", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "9"},
+            {"category": "SHAKE", "name": "Butter Scotch Shake", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "10"},
+            {"category": "MOCKTAIL", "name": "Sunny Setup", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "11"},
+            {"category": "MOCKTAIL", "name": "Blue Lugan", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "12"},
+            {"category": "MOCKTAIL", "name": "Panch Mel", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "13"},
+            {"category": "MOCKTAIL", "name": "Fresh Lemon Soda", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": "14"},
+            {"category": "MOCKTAIL", "name": "Virgin Mojito", "price": 139.00, "description": "", "available": true, "imageUrl": "", "id": "15"},
+            {"category": "DESERT", "name": "Vanila Ice Cream", "price": 49.00, "description": "", "available": true, "imageUrl": "", "id": "16"},
+            {"category": "DESERT", "name": "Butter Scotch Ice Cream", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "17"},
+            {"category": "DESERT", "name": "Chocolate Ice Cream", "price": 69.00, "description": "", "available": true, "imageUrl": "", "id": "18"},
+            {"category": "DESERT", "name": "Rosperel Ice Cream", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": "19"},
+            {"category": "BURGER", "name": "Veg Burger", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "20"},
+            {"category": "BURGER", "name": "Veg Cheese Burger", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": "21"},
+            {"category": "SANDWICH", "name": "Veg Grill Sandwich", "price": 129.00, "description": "", "available": true, "imageUrl": "", "id": "22"},
+            {"category": "SANDWICH", "name": "Veg Sandwich & French Fry", "price": 79.00, "description": "", "available": true, "imageUrl": "", "id": "23"},
+            {"category": "SANDWICH", "name": "Bombay Sandwich", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": "24"},
+            {"category": "SANDWICH", "name": "Chipotle Sandwich", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": "25"},
+            {"category": "SANDWICH", "name": "Bread Butter Cheese Sandwich", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "26"},
+            {"category": "SANDWICH", "name": "Paneer Sandwich", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "27"},
+            {"category": "SOUP", "name": "Hot & Sour Soup", "price": 119.00, "description": "", "available": true, "imageUrl": "", "id": "28"},
+            {"category": "SOUP", "name": "Manchau Soup", "price": 109.00, "description": "", "available": true, "imageUrl": "", "id": "29"},
+            {"category": "SOUP", "name": "Tomato Soup", "price": 129.00, "description": "", "available": true, "imageUrl": "", "id": "30"},
+            {"category": "SOUP", "name": "Sweet Corn Soup", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": "31"},
+            {"category": "SOUP", "name": "Lemon Coriander Soup", "price": 130.00, "description": "", "available": true, "imageUrl": "", "id": "32"},
+            {"category": "SOUP", "name": "Cream Mushroom Soup", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "33"},
+            {"category": "CHINESE", "name": "Paneer Chilli", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": "34"},
+            {"category": "CHINESE", "name": "Honey Chilli", "price": 289.00, "description": "", "available": true, "imageUrl": "", "id": "35"},
+            {"category": "CHINESE", "name": "Chilli Potato", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "36"},
+            {"category": "CHINESE", "name": "Chilli Mushroom", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": "37"},
+            {"category": "CHINESE", "name": "Manchurian Gravy & Dry", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "38"},
+            {"category": "CHINESE", "name": "Noodles", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "39"},
+            {"category": "CHINESE", "name": "Hakka Noodles", "price": 139.00, "description": "", "available": true, "imageUrl": "", "id": "40"},
+            {"category": "CHINESE", "name": "Schezwan Noodles", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "41"},
+            {"category": "RICE", "name": "Fried Rice", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "42"},
+            {"category": "RICE", "name": "Schezwan Rice", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "43"},
+            {"category": "RICE", "name": "Bloom Special Rice", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": "44"},
+            {"category": "TANDOOR", "name": "Paneer Tikka", "price": 269.00, "description": "", "available": true, "imageUrl": "", "id": "45"},
+            {"category": "TANDOOR", "name": "Achari Paneer Tikka", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": "46"},
+            {"category": "TANDOOR", "name": "Malai Paneer Tikka", "price": 299.00, "description": "", "available": true, "imageUrl": "", "id": "47"},
+            {"category": "TANDOOR", "name": "Hara Bhara Kabab", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "48"},
+            {"category": "TANDOOR", "name": "Corn Kabab", "price": 219.00, "description": "", "available": true, "imageUrl": "", "id": "49"},
+            {"category": "TANDOOR", "name": "Tandoori Soya Chap", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "50"},
+            {"category": "TANDOOR", "name": "Aacharya Soya Chap", "price": 209.00, "description": "", "available": true, "imageUrl": "", "id": "51"},
+            {"category": "TANDOOR", "name": "Malai Soya Chap", "price": 259.00, "description": "", "available": true, "imageUrl": "", "id": "52"},
+            {"category": "PIZZA", "name": "Veg Pizza (B / S) - Big", "price": 229.00, "description": "", "available": true, "imageUrl": "", "id": "53"},
+            {"category": "PIZZA", "name": "Veg Pizza (B / S) - Small", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "54"},
+            {"category": "PIZZA", "name": "Margaret Pizza (B / S) - Big", "price": 270.00, "description": "", "available": true, "imageUrl": "", "id": "55"},
+            {"category": "PIZZA", "name": "Margaret Pizza (B / S) - Small", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "56"},
+            {"category": "PIZZA", "name": "Paneer Tikka Pizza (B / S) - Big", "price": 249.00, "description": "", "available": true, "imageUrl": "", "id": "57"},
+            {"category": "PIZZA", "name": "Paneer Tikka Pizza (B / S) - Small", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "58"},
+            {"category": "PIZZA", "name": "Farm House Pizza (B / S) - Big", "price": 279.00, "description": "", "available": true, "imageUrl": "", "id": "59"},
+            {"category": "PIZZA", "name": "Farm House Pizza (B / S) - Small", "price": 209.00, "description": "", "available": true, "imageUrl": "", "id": "60"},
+            {"category": "PASTA", "name": "Pasto Pasta", "price": 249.00, "description": "", "available": true, "imageUrl": "", "id": "61"},
+            {"category": "PASTA", "name": "White Sauce Pasta", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "62"},
+            {"category": "PASTA", "name": "Red Sauce Pasta", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": "63"},
+            {"category": "SMOOTHIE", "name": "Sun Ban Smoothie", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "64"},
+            {"category": "SMOOTHIE", "name": "Hang Over Smoothie", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": "65"}
         ];
-        if (!menuItems.length) {
-            menuItems = seedMenu;
-            saveMenu();
+
+        // Initialize Firebase Data with Firestore
+        function initializeData() {
+            db.collection('menu').get().then(snapshot => {
+                if (snapshot.empty) {
+                    seedMenu.forEach(item => {
+                        db.collection('menu').doc(item.id).set(item);
+                    });
+                    menuItems = seedMenu;
+                } else {
+                    menuItems = snapshot.docs.map(doc => doc.data());
+                }
+                render();
+            });
+            db.collection('orders').onSnapshot(snapshot => {
+                orders = snapshot.docs.map(doc => doc.data());
+                render();
+            });
+            db.doc('settings/global').get().then(doc => {
+                if (doc.exists) {
+                    settings = doc.data();
+                    updateHeaderFooter();
+                } else {
+                    db.doc('settings/global').set(settings);
+                }
+            });
         }
 
         // Save Functions
-        function saveMenu() { localStorage.setItem('bloom-menu', JSON.stringify(menuItems)); }
-        function saveOrders() { localStorage.setItem('bloom-orders', JSON.stringify(orders)); }
+        function saveMenu() {
+            menuItems.forEach(item => {
+                db.collection('menu').doc(item.id).set(item);
+            });
+        }
+        function saveOrders() {
+            orders.forEach(order => {
+                db.collection('orders').doc(order.id.toString()).set(order);
+            });
+        }
         function saveSettings() { 
-            localStorage.setItem('bloom-settings', JSON.stringify(settings)); 
+            db.doc('settings/global').set(settings); 
             updateHeaderFooter();
         }
 
@@ -198,6 +205,7 @@
             document.getElementById('catchy-line').textContent = settings.catchyLine;
             document.getElementById('address').textContent = settings.address;
             document.getElementById('footer-line').textContent = settings.catchyLine;
+            document.getElementById('realtime-status').textContent = 'Realtime: connected';
         }
 
         // Logout Function
@@ -207,17 +215,6 @@
             currentOrder = { items: [], total: 0, status: 'New', timestamp: new Date().toISOString(), notes: '', type: 'Dine-in', table: '' };
             render();
         }
-
-        // Storage Event for Multi-tab Sync
-        window.addEventListener('storage', e => {
-            if (e.key === 'bloom-menu') menuItems = JSON.parse(e.newValue);
-            if (e.key === 'bloom-orders') orders = JSON.parse(e.newValue);
-            if (e.key === 'bloom-settings') {
-                settings = JSON.parse(e.newValue);
-                updateHeaderFooter();
-            }
-            render();
-        });
 
         // Login
         function renderLogin() {
@@ -278,7 +275,7 @@
                 </div>
                 <div class="card">
                     <h3>Quick Items</h3>
-                    ${topItems.map(item => `<button onclick="quickAdd(${item.id})" title="${item.name} - ₹${item.price}">${item.name}</button>`).join('')}
+                    ${topItems.map(item => `<button onclick="quickAdd('${item.id}') " title="${item.name} - ₹${item.price}">${item.name}</button>`).join('')}
                 </div>
                 <div class="card">
                     <h3>Active Orders</h3>
@@ -290,7 +287,7 @@
         function showAutocomplete(query) {
             const results = query ? menuItems.filter(item => item.available && item.name.toLowerCase().includes(query.toLowerCase())).slice(0, 5) : [];
             document.getElementById('autocomplete').innerHTML = results.map(item => `
-                <div onclick="selectItem(${item.id}, '${item.name}')" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
+                <div onclick="selectItem('${item.id}', '${item.name}')" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
                     ${item.name} - ₹${item.price} (${item.category})
                 </div>
             `).join('');
@@ -340,16 +337,11 @@
 
         function placeOrder() {
             if (!currentOrder.items.length) return alert('Add items to the order');
-            currentOrder.id = Date.now();
+            currentOrder.id = Date.now().toString();
             currentOrder.notes = document.getElementById('notes').value;
             currentOrder.type = document.getElementById('order-type').value;
             currentOrder.table = document.getElementById('table').value || 'N/A';
-            orders.unshift(currentOrder);
-            saveOrders();
-            window.dispatchEvent(new StorageEvent('storage', { key: 'bloom-orders', newValue: JSON.stringify(orders) }));
-            const activeOrders = document.getElementById('active-orders');
-            activeOrders.style.background = '#ffffcc';
-            setTimeout(() => activeOrders.style.background = '', 500);
+            db.collection('orders').doc(currentOrder.id).set(currentOrder);
             currentOrder = { items: [], total: 0, status: 'New', timestamp: new Date().toISOString(), notes: '', type: 'Dine-in', table: '' };
             updateCurrentOrder();
             render();
@@ -363,7 +355,7 @@
                     <p>${order.type} | ${order.table}</p>
                     <ul>${order.items.map(it => `<li>${it.name} x ${it.qty}</li>`).join('')}</ul>
                     <p>Total: ₹${order.total.toFixed(2)}</p>
-                    <select onchange="updateStatus(${order.id}, this.value)">
+                    <select onchange="updateStatus('${order.id}', this.value)">
                         <option value="New" ${order.status === 'New' ? 'selected' : ''}>New</option>
                         <option value="Preparing" ${order.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
                         <option value="Ready" ${order.status === 'Ready' ? 'selected' : ''}>Ready</option>
@@ -374,13 +366,8 @@
         }
 
         function updateStatus(id, status) {
-            const order = orders.find(o => o.id === id);
-            if (order) {
-                order.status = status;
-                saveOrders();
-                window.dispatchEvent(new StorageEvent('storage', { key: 'bloom-orders', newValue: JSON.stringify(orders) }));
-                render();
-            }
+            db.collection('orders').doc(id).update({ status });
+            render();
         }
 
         // Manager Views
@@ -409,7 +396,7 @@
         }
 
         function renderManagerOrders() {
-            const liveOrders = orders.filter(o => o.status !== 'Served').sort((a, b) => b.id - a.id);
+            const liveOrders = orders.filter(o => o.status !== 'Served').sort((a, b) => b.timestamp - a.timestamp);
             return `
                 <h2>Live Orders</h2>
                 ${renderOrders(liveOrders)}
@@ -427,17 +414,17 @@
                     ${order.items.map((it, idx) => `
                         <p>
                             ${it.name} 
-                            <input type="number" value="${it.qty}" min="1" onchange="updateOrderItem(${id}, ${idx}, this.value)" aria-label="Quantity for ${it.name}">
+                            <input type="number" value="${it.qty}" min="1" onchange="updateOrderItem('${id}', ${idx}, this.value)" aria-label="Quantity for ${it.name}">
                             @ ₹${it.price.toFixed(2)} = ₹${(it.qty * it.price).toFixed(2)}
-                            <button onclick="removeOrderItem(${id}, ${idx})">Remove</button>
+                            <button onclick="removeOrderItem('${id}', ${idx})">Remove</button>
                         </p>
                     `).join('')}
                     <label>Discount (₹):</label>
-                    <input type="number" id="discount-${id}" value="0" step="0.01" onchange="recalculateOrderTotal(${id})">
+                    <input type="number" id="discount-${id}" value="0" step="0.01" onchange="recalculateOrderTotal('${id}')">
                     <p>Tax: ${settings.taxRate}%</p>
                     <p><strong>Total: ₹<span id="total-${id}">${order.total.toFixed(2)}</span></strong></p>
-                    <button onclick="printReceipt(${id})">Print Receipt</button>
-                    <button onclick="saveOrderChanges(${id})">Save</button>
+                    <button onclick="printReceipt('${id}')">Print Receipt</button>
+                    <button onclick="saveOrderChanges('${id}')">Save</button>
                     <button onclick="this.parentElement.parentElement.remove()">Close</button>
                 </div>
             `;
@@ -472,8 +459,8 @@
         }
 
         function saveOrderChanges(id) {
-            saveOrders();
-            window.dispatchEvent(new StorageEvent('storage', { key: 'bloom-orders', newValue: JSON.stringify(orders) }));
+            const order = orders.find(o => o.id === id);
+            db.collection('orders').doc(id).set(order);
             alert('Order updated');
             document.querySelector('.modal').remove();
             render();
@@ -545,13 +532,13 @@
                     o.table.toLowerCase().includes(search) || 
                     o.items.some(it => it.name.toLowerCase().includes(search));
                 return matchesDate && matchesSearch;
-            }).sort((a, b) => b.id - a.id);
+            }).sort((a, b) => b.timestamp - a.timestamp);
             return filtered.length ? filtered.map(order => `
-                <div class="card" onclick="openBillModal(${order.id})">
+                <div class="card" onclick="openBillModal('${order.id}')">
                     <h4>#${order.id} - ${order.status}</h4>
                     <p>${new Date(order.timestamp).toLocaleString()}</p>
                     <p>${order.items.length} items | ₹${order.total.toFixed(2)}</p>
-                    <button onclick="printReceipt(${order.id}); event.stopPropagation();">Re-Print</button>
+                    <button onclick="printReceipt('${order.id}'); event.stopPropagation();">Re-Print</button>
                 </div>
             `).join('') : '<p>No orders found.</p>';
         }
@@ -681,16 +668,16 @@
                 ${menuItems.map(item => `
                     <div class="card">
                         <label>Name:</label>
-                        <input value="${item.name}" onchange="updateMenuItem(${item.id}, 'name', this.value)">
+                        <input value="${item.name}" onchange="updateMenuItem('${item.id}', 'name', this.value)">
                         <label>Category:</label>
-                        <input value="${item.category}" onchange="updateMenuItem(${item.id}, 'category', this.value)">
+                        <input value="${item.category}" onchange="updateMenuItem('${item.id}', 'category', this.value)">
                         <label>Price (₹):</label>
-                        <input type="number" value="${item.price}" step="0.01" onchange="updateMenuItem(${item.id}, 'price', this.value)">
+                        <input type="number" value="${item.price}" step="0.01" onchange="updateMenuItem('${item.id}', 'price', this.value)">
                         <label>Description:</label>
-                        <input value="${item.description}" onchange="updateMenuItem(${item.id}, 'description', this.value)">
+                        <input value="${item.description}" onchange="updateMenuItem('${item.id}', 'description', this.value)">
                         <label>Available:</label>
-                        <input type="checkbox" ${item.available ? 'checked' : ''} onchange="updateMenuItem(${item.id}, 'available', this.checked)">
-                        <button onclick="removeMenuItem(${item.id})">Remove</button>
+                        <input type="checkbox" ${item.available ? 'checked' : ''} onchange="updateMenuItem('${item.id}', 'available', this.checked)">
+                        <button onclick="removeMenuItem('${item.id}')">Remove</button>
                     </div>
                 `).join('')}
                 <button onclick="addMenuItem()">Add Item</button>
@@ -703,25 +690,23 @@
             const item = menuItems.find(i => i.id === id);
             if (item) {
                 item[field] = field === 'price' ? parseFloat(value) || 0 : field === 'available' ? value : value;
-                saveMenu();
-                window.dispatchEvent(new StorageEvent('storage', { key: 'bloom-menu', newValue: JSON.stringify(menuItems) }));
+                db.collection('menu').doc(id).set(item);
             }
         }
 
         function removeMenuItem(id) {
             if (confirm('Remove item?')) {
+                db.collection('menu').doc(id).delete();
                 menuItems = menuItems.filter(i => i.id !== id);
-                saveMenu();
-                window.dispatchEvent(new StorageEvent('storage', { key: 'bloom-menu', newValue: JSON.stringify(menuItems) }));
                 render();
             }
         }
 
         function addMenuItem() {
-            const newId = menuItems.length ? Math.max(...menuItems.map(i => i.id)) + 1 : 1;
-            menuItems.push({ id: newId, category: '', name: 'New Item', price: 0, description: '', available: true, imageUrl: '' });
-            saveMenu();
-            window.dispatchEvent(new StorageEvent('storage', { key: 'bloom-menu', newValue: JSON.stringify(menuItems) }));
+            const newId = Date.now().toString();
+            const newItem = { id: newId, category: '', name: 'New Item', price: 0, description: '', available: true, imageUrl: '' };
+            menuItems.push(newItem);
+            db.collection('menu').doc(newId).set(newItem);
             render();
         }
 
@@ -733,8 +718,9 @@
                 const lines = e.target.result.split('\n').slice(1).filter(line => line.trim());
                 const newItems = lines.map((line, idx) => {
                     const [category, name, price] = line.split(',');
-                    return {
-                        id: menuItems.length + idx + 1,
+                    const newId = Date.now() + idx + '';
+                    const item = {
+                        id: newId,
                         category: category.trim(),
                         name: name.trim(),
                         price: parseFloat(price) || 0,
@@ -742,10 +728,10 @@
                         available: true,
                         imageUrl: ''
                     };
+                    db.collection('menu').doc(newId).set(item);
+                    return item;
                 });
                 menuItems = [...menuItems, ...newItems];
-                saveMenu();
-                window.dispatchEvent(new StorageEvent('storage', { key: 'bloom-menu', newValue: JSON.stringify(menuItems) }));
                 render();
             };
             reader.readAsText(file);
@@ -800,12 +786,21 @@
             document.querySelectorAll('.card:not(.modal .card)').forEach(card => {
                 const idMatch = card.querySelector('h4')?.textContent.match(/#(\d+)/);
                 if (idMatch) {
-                    card.onclick = () => openBillModal(parseInt(idMatch[1]));
+                    card.onclick = () => openBillModal(idMatch[1]);
                 }
             });
         }
 
-        updateHeaderFooter();
+        // Handle Firebase offline
+        firebase.database().goOffline();  // Not applicable for Firestore; use Firestore offline persistence if needed
+        firebase.firestore().enableNetwork().then(() => {
+            document.getElementById('realtime-status').textContent = 'Realtime: connected';
+        }).catch(() => {
+            document.getElementById('realtime-status').textContent = 'Realtime: offline (local mode)';
+            alert('Offline: Changes may not sync across devices until reconnected.');
+        });
+
+        initializeData();
         render();
     </script>
 </body>
