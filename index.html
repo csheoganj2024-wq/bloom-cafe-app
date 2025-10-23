@@ -1,808 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bloom Cafe & Restaurant</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; background: #f5f5f5; color: #333; margin: 0; padding: 0; }
-        header { background: #228b22; color: white; padding: 10px; text-align: center; }
-        footer { background: #8b4513; color: white; padding: 10px; text-align: center; font-size: 0.8em; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; position: relative; }
-        .card { background: white; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 20px; margin: 10px 0; }
-        .card:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        button { background: #228b22; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
-        button:hover { background: #1e7a1e; }
-        input, select { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
-        label { display: block; margin: 5px 0; font-weight: bold; }
-        nav { display: flex; justify-content: space-around; background: #f0f0f0; padding: 10px; }
-        nav button { background: none; color: #228b22; border: none; font-size: 1em; }
-        nav button.active { font-weight: bold; }
-        #realtime-status { font-size: 0.8em; color: green; }
-        #autocomplete { background: white; border: 1px solid #ccc; max-height: 150px; overflow-y: auto; position: absolute; width: calc(100% - 20px); z-index: 10; }
-        #autocomplete div { padding: 5px; cursor: pointer; }
-        #autocomplete div:hover { background: #f0f0f0; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .modal .card { max-width: 500px; cursor: auto; }
-        canvas { max-width: 100%; margin: 10px 0; }
-        .logout-btn { position: absolute; top: 20px; right: 20px; }
-        @media print {
-            body * { visibility: hidden; }
-            .receipt, .receipt * { visibility: visible; }
-            .receipt { position: absolute; left: 0; top: 0; width: 80mm; font-size: 10pt; }
-            .receipt h1 { font-size: 12pt; text-align: center; }
-            .receipt .total { font-size: 14pt; font-weight: bold; }
-            button, nav, header:not(.receipt-header), footer:not(.receipt-footer) { display: none !important; }
-        }
-        @media (max-width: 600px) { 
-            nav { flex-direction: column; } 
-            .card { padding: 10px; } 
-            .logout-btn { top: 10px; right: 10px; padding: 8px 16px; }
-        }
-        input:focus, select:focus, button:focus { outline: 2px solid #228b22; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloom Cafe</title>
+<style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f8f8f8; }
+    header { background: #ff6f61; color: white; padding: 15px; text-align: center; }
+    .container { max-width: 800px; margin: auto; padding: 20px; }
+    .menu-item, .order-item { display: flex; justify-content: space-between; margin: 10px 0; padding: 10px; background: white; border-radius: 8px; }
+    button { padding: 5px 10px; cursor: pointer; }
+    input, select { padding: 5px; margin: 5px 0; width: 100%; }
+    .hidden { display: none; }
+</style>
 </head>
 <body>
-    <header>
-        <h1 id="cafe-name">BLOOM CAFE & RESTAURANT</h1>
-        <p id="contact">Contact: 9001160228</p>
-        <p id="catchy-line">Taste the Bloom — Come Back Soon!</p>
-        <div id="realtime-status">Realtime: connected</div>
-    </header>
-    <div class="container" id="app"></div>
-    <footer>
-        <p id="address">Deora Plaza, Kesarpura Road, Sheoganj</p>
-        <p id="footer-line">Taste the Bloom — Come Back Soon!</p>
-    </footer>
 
-    <script>
-       // Firebase Configuration
+<header>
+    <h1>Bloom Cafe</h1>
+    <p>Contact: 9001160228 | Address: Deora Plaza, Kesarpura Road, Sheoganj</p>
+</header>
+
+<div class="container">
+
+<!-- Login Page -->
+<div id="loginPage">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username (manager/kitchen)">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+</div>
+
+<!-- Manager Page -->
+<div id="managerPage" class="hidden">
+    <h2>Menu Management</h2>
+    <input type="text" id="itemName" placeholder="Item Name">
+    <input type="text" id="itemDesc" placeholder="Description">
+    <input type="number" id="itemPrice" placeholder="Price">
+    <input type="text" id="itemImage" placeholder="Image URL">
+    <button onclick="addMenuItem()">Add Item</button>
+
+    <h3>Menu Items</h3>
+    <div id="menuList"></div>
+</div>
+
+<!-- Kitchen Page -->
+<div id="kitchenPage" class="hidden">
+    <h2>Orders</h2>
+    <div id="orderList"></div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+// Your Firebase config
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",  // Replace with your actual apiKey
+  apiKey: "AIzaSyCY_PYp0VxGmm4d9OuKRqDRkp-ZCOMLRjU",
   authDomain: "bloom-cafe-7d929.firebaseapp.com",
   projectId: "bloom-cafe-7d929",
-  storageBucket: "bloom-cafe-7d929.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",  // Replace with your sender ID
-  appId: "YOUR_APP_ID"  // Replace with your appId
+  storageBucket: "bloom-cafe-7d929.firebasestorage.app",
+  messagingSenderId: "35820544683",
+  appId: "1:35820544683:web:e26dcea6301e4c9a9e8dee",
+  measurementId: "G-JP1R587JCC"
 };
 
-// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-        // Data Models
-        let menuItems = [];
-        let orders = [];
-        let settings = { 
-            taxRate: 0, 
-            passwords: { manager: 'manager', kitchen: 'kitchen' }, 
-            cafeName: 'BLOOM CAFE & RESTAURANT', 
-            contact: '9001160228', 
-            address: 'Deora Plaza, Kesarpura Road, Sheoganj', 
-            catchyLine: 'Taste the Bloom — Come Back Soon!' 
-        };
-        let currentUser = null;
-        let currentView = 'login';
-        let currentOrder = { items: [], total: 0, status: 'New', timestamp: new Date().toISOString(), notes: '', type: 'Dine-in', table: '' };
+// Simple login (hardcoded)
+function login() {
+    const user = document.getElementById('username').value.toLowerCase();
+    const pass = document.getElementById('password').value;
 
-        // Seed Menu
-        const seedMenu = [
-            {"category": "COLD COFFEE", "name": "Cold Coffee", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "1"},
-            {"category": "COLD COFFEE", "name": "Cold Coffee With Ice Cream", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "2"},
-            {"category": "COLD COFFEE", "name": "Cookies Tea / Masala Tea", "price": 49.00, "description": "", "available": true, "imageUrl": "", "id": "3"},
-            {"category": "COLD COFFEE", "name": "Black Tea", "price": 39.00, "description": "", "available": true, "imageUrl": "", "id": "4"},
-            {"category": "COLD COFFEE", "name": "Hot Coffee", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "5"},
-            {"category": "SHAKE", "name": "Vanila Shake", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "6"},
-            {"category": "SHAKE", "name": "Chocolate Shake", "price": 159.00, "description": "", "available": true, "imageUrl": "", "id": "7"},
-            {"category": "SHAKE", "name": "Kit Kat Shake", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "8"},
-            {"category": "SHAKE", "name": "Oreo Shake", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "9"},
-            {"category": "SHAKE", "name": "Butter Scotch Shake", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "10"},
-            {"category": "MOCKTAIL", "name": "Sunny Setup", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "11"},
-            {"category": "MOCKTAIL", "name": "Blue Lugan", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "12"},
-            {"category": "MOCKTAIL", "name": "Panch Mel", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "13"},
-            {"category": "MOCKTAIL", "name": "Fresh Lemon Soda", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": "14"},
-            {"category": "MOCKTAIL", "name": "Virgin Mojito", "price": 139.00, "description": "", "available": true, "imageUrl": "", "id": "15"},
-            {"category": "DESERT", "name": "Vanila Ice Cream", "price": 49.00, "description": "", "available": true, "imageUrl": "", "id": "16"},
-            {"category": "DESERT", "name": "Butter Scotch Ice Cream", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "17"},
-            {"category": "DESERT", "name": "Chocolate Ice Cream", "price": 69.00, "description": "", "available": true, "imageUrl": "", "id": "18"},
-            {"category": "DESERT", "name": "Rosperel Ice Cream", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": "19"},
-            {"category": "BURGER", "name": "Veg Burger", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "20"},
-            {"category": "BURGER", "name": "Veg Cheese Burger", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": "21"},
-            {"category": "SANDWICH", "name": "Veg Grill Sandwich", "price": 129.00, "description": "", "available": true, "imageUrl": "", "id": "22"},
-            {"category": "SANDWICH", "name": "Veg Sandwich & French Fry", "price": 79.00, "description": "", "available": true, "imageUrl": "", "id": "23"},
-            {"category": "SANDWICH", "name": "Bombay Sandwich", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": "24"},
-            {"category": "SANDWICH", "name": "Chipotle Sandwich", "price": 89.00, "description": "", "available": true, "imageUrl": "", "id": "25"},
-            {"category": "SANDWICH", "name": "Bread Butter Cheese Sandwich", "price": 59.00, "description": "", "available": true, "imageUrl": "", "id": "26"},
-            {"category": "SANDWICH", "name": "Paneer Sandwich", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "27"},
-            {"category": "SOUP", "name": "Hot & Sour Soup", "price": 119.00, "description": "", "available": true, "imageUrl": "", "id": "28"},
-            {"category": "SOUP", "name": "Manchau Soup", "price": 109.00, "description": "", "available": true, "imageUrl": "", "id": "29"},
-            {"category": "SOUP", "name": "Tomato Soup", "price": 129.00, "description": "", "available": true, "imageUrl": "", "id": "30"},
-            {"category": "SOUP", "name": "Sweet Corn Soup", "price": 99.00, "description": "", "available": true, "imageUrl": "", "id": "31"},
-            {"category": "SOUP", "name": "Lemon Coriander Soup", "price": 130.00, "description": "", "available": true, "imageUrl": "", "id": "32"},
-            {"category": "SOUP", "name": "Cream Mushroom Soup", "price": 149.00, "description": "", "available": true, "imageUrl": "", "id": "33"},
-            {"category": "CHINESE", "name": "Paneer Chilli", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": "34"},
-            {"category": "CHINESE", "name": "Honey Chilli", "price": 289.00, "description": "", "available": true, "imageUrl": "", "id": "35"},
-            {"category": "CHINESE", "name": "Chilli Potato", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "36"},
-            {"category": "CHINESE", "name": "Chilli Mushroom", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": "37"},
-            {"category": "CHINESE", "name": "Manchurian Gravy & Dry", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "38"},
-            {"category": "CHINESE", "name": "Noodles", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "39"},
-            {"category": "CHINESE", "name": "Hakka Noodles", "price": 139.00, "description": "", "available": true, "imageUrl": "", "id": "40"},
-            {"category": "CHINESE", "name": "Schezwan Noodles", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "41"},
-            {"category": "RICE", "name": "Fried Rice", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "42"},
-            {"category": "RICE", "name": "Schezwan Rice", "price": 169.00, "description": "", "available": true, "imageUrl": "", "id": "43"},
-            {"category": "RICE", "name": "Bloom Special Rice", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": "44"},
-            {"category": "TANDOOR", "name": "Paneer Tikka", "price": 269.00, "description": "", "available": true, "imageUrl": "", "id": "45"},
-            {"category": "TANDOOR", "name": "Achari Paneer Tikka", "price": 239.00, "description": "", "available": true, "imageUrl": "", "id": "46"},
-            {"category": "TANDOOR", "name": "Malai Paneer Tikka", "price": 299.00, "description": "", "available": true, "imageUrl": "", "id": "47"},
-            {"category": "TANDOOR", "name": "Hara Bhara Kabab", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "48"},
-            {"category": "TANDOOR", "name": "Corn Kabab", "price": 219.00, "description": "", "available": true, "imageUrl": "", "id": "49"},
-            {"category": "TANDOOR", "name": "Tandoori Soya Chap", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "50"},
-            {"category": "TANDOOR", "name": "Aacharya Soya Chap", "price": 209.00, "description": "", "available": true, "imageUrl": "", "id": "51"},
-            {"category": "TANDOOR", "name": "Malai Soya Chap", "price": 259.00, "description": "", "available": true, "imageUrl": "", "id": "52"},
-            {"category": "PIZZA", "name": "Veg Pizza (B / S) - Big", "price": 229.00, "description": "", "available": true, "imageUrl": "", "id": "53"},
-            {"category": "PIZZA", "name": "Veg Pizza (B / S) - Small", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "54"},
-            {"category": "PIZZA", "name": "Margaret Pizza (B / S) - Big", "price": 270.00, "description": "", "available": true, "imageUrl": "", "id": "55"},
-            {"category": "PIZZA", "name": "Margaret Pizza (B / S) - Small", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "56"},
-            {"category": "PIZZA", "name": "Paneer Tikka Pizza (B / S) - Big", "price": 249.00, "description": "", "available": true, "imageUrl": "", "id": "57"},
-            {"category": "PIZZA", "name": "Paneer Tikka Pizza (B / S) - Small", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "58"},
-            {"category": "PIZZA", "name": "Farm House Pizza (B / S) - Big", "price": 279.00, "description": "", "available": true, "imageUrl": "", "id": "59"},
-            {"category": "PIZZA", "name": "Farm House Pizza (B / S) - Small", "price": 209.00, "description": "", "available": true, "imageUrl": "", "id": "60"},
-            {"category": "PASTA", "name": "Pasto Pasta", "price": 249.00, "description": "", "available": true, "imageUrl": "", "id": "61"},
-            {"category": "PASTA", "name": "White Sauce Pasta", "price": 199.00, "description": "", "available": true, "imageUrl": "", "id": "62"},
-            {"category": "PASTA", "name": "Red Sauce Pasta", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": "63"},
-            {"category": "SMOOTHIE", "name": "Sun Ban Smoothie", "price": 179.00, "description": "", "available": true, "imageUrl": "", "id": "64"},
-            {"category": "SMOOTHIE", "name": "Hang Over Smoothie", "price": 189.00, "description": "", "available": true, "imageUrl": "", "id": "65"}
-        ];
+    if(user === 'manager' && pass === '1234') {
+        document.getElementById('loginPage').classList.add('hidden');
+        document.getElementById('managerPage').classList.remove('hidden');
+        loadMenuItems();
+    } else if(user === 'kitchen' && pass === '1234') {
+        document.getElementById('loginPage').classList.add('hidden');
+        document.getElementById('kitchenPage').classList.remove('hidden');
+        loadOrders();
+    } else {
+        alert('Invalid credentials!');
+    }
+}
 
-        // Initialize Firebase Data with Firestore
-        function initializeData() {
-            db.collection('menu').get().then(snapshot => {
-                if (snapshot.empty) {
-                    seedMenu.forEach(item => {
-                        db.collection('menu').doc(item.id).set(item);
-                    });
-                    menuItems = seedMenu;
-                } else {
-                    menuItems = snapshot.docs.map(doc => doc.data());
-                }
-                render();
-            });
-            db.collection('orders').onSnapshot(snapshot => {
-                orders = snapshot.docs.map(doc => doc.data());
-                render();
-            });
-            db.doc('settings/global').get().then(doc => {
-                if (doc.exists) {
-                    settings = doc.data();
-                    updateHeaderFooter();
-                } else {
-                    db.doc('settings/global').set(settings);
-                }
-            });
-        }
+// Manager: Add Menu Item
+function addMenuItem() {
+    const name = document.getElementById('itemName').value;
+    const desc = document.getElementById('itemDesc').value;
+    const price = parseFloat(document.getElementById('itemPrice').value);
+    const image = document.getElementById('itemImage').value;
 
-        // Save Functions
-        function saveMenu() {
-            menuItems.forEach(item => {
-                db.collection('menu').doc(item.id).set(item);
-            });
-        }
-        function saveOrders() {
-            orders.forEach(order => {
-                db.collection('orders').doc(order.id.toString()).set(order);
-            });
-        }
-        function saveSettings() { 
-            db.doc('settings/global').set(settings); 
-            updateHeaderFooter();
-        }
+    if(!name || !desc || !price) { alert('Please fill all fields'); return; }
 
-        function updateHeaderFooter() {
-            document.getElementById('cafe-name').textContent = settings.cafeName;
-            document.getElementById('contact').textContent = `Contact: ${settings.contact}`;
-            document.getElementById('catchy-line').textContent = settings.catchyLine;
-            document.getElementById('address').textContent = settings.address;
-            document.getElementById('footer-line').textContent = settings.catchyLine;
-            document.getElementById('realtime-status').textContent = 'Realtime: connected';
-        }
+    db.collection('menu').add({ name, desc, price, image })
+    .then(() => {
+        alert('Item added!');
+        document.getElementById('itemName').value = '';
+        document.getElementById('itemDesc').value = '';
+        document.getElementById('itemPrice').value = '';
+        document.getElementById('itemImage').value = '';
+        loadMenuItems();
+    });
+}
 
-        // Logout Function
-        function logout() {
-            currentUser = null;
-            currentView = 'login';
-            currentOrder = { items: [], total: 0, status: 'New', timestamp: new Date().toISOString(), notes: '', type: 'Dine-in', table: '' };
-            render();
-        }
-
-        // Login
-        function renderLogin() {
-            return `
-                <div class="card">
-                    <h2>Login</h2>
-                    <label for="role">Role:</label>
-                    <select id="role" aria-label="Select role">
-                        <option value="manager">Manager</option>
-                        <option value="kitchen">Kitchen</option>
-                    </select>
-                    <label for="password">Password:</label>
-                    <input type="password" id="password" placeholder="Enter password" aria-label="Password">
-                    <button onclick="login()" style="width: 100%; margin-top: 10px;">Login</button>
-                    <p style="font-size: 0.8em; color: #666;">Use 'manager' or 'kitchen' as password</p>
-                </div>
+// Load Menu Items
+function loadMenuItems() {
+    const menuList = document.getElementById('menuList');
+    menuList.innerHTML = '';
+    db.collection('menu').get().then(snapshot => {
+        snapshot.forEach(doc => {
+            const item = doc.data();
+            const div = document.createElement('div');
+            div.classList.add('menu-item');
+            div.innerHTML = `
+                <span>${item.name} - ₹${item.price}</span>
+                <button onclick="deleteItem('${doc.id}')">Delete</button>
             `;
-        }
-
-        function login() {
-            const role = document.getElementById('role').value;
-            const pass = document.getElementById('password').value;
-            if (pass === settings.passwords[role]) {
-                currentUser = role;
-                currentView = role;
-                render();
-            } else {
-                alert('Invalid password');
-            }
-        }
-
-        // Kitchen View
-        function renderKitchen() {
-            const topItems = menuItems.filter(i => i.available).slice(0, 8);
-            return `
-                <button class="logout-btn" onclick="logout()" aria-label="Logout">Logout</button>
-                <div class="card">
-                    <h2>New Order</h2>
-                    <label for="item-search">Item:</label>
-                    <input type="text" id="item-search" placeholder="Search item..." oninput="showAutocomplete(this.value)" list="menu-items" aria-label="Search menu item">
-                    <datalist id="menu-items">${menuItems.filter(i => i.available).map(i => `<option value="${i.name} - ₹${i.price}">${i.category}</option>`).join('')}</datalist>
-                    <div id="autocomplete"></div>
-                    <label for="qty">Quantity:</label>
-                    <input type="number" id="qty" value="1" min="1" aria-label="Quantity">
-                    <label for="notes">Notes:</label>
-                    <input type="text" id="notes" placeholder="Special instructions" aria-label="Order notes">
-                    <label for="order-type">Type:</label>
-                    <select id="order-type" aria-label="Order type">
-                        <option>Dine-in</option>
-                        <option>Takeaway</option>
-                    </select>
-                    <label for="table">Table/Customer:</label>
-                    <input type="text" id="table" placeholder="Table no or customer name" aria-label="Table or customer">
-                    <button onclick="addItemToOrder()">Add Item</button>
-                    <div id="current-order-items"></div>
-                    <p><strong>Total: ₹<span id="running-total">0</span></strong></p>
-                    <button onclick="placeOrder()">Place Order</button>
-                </div>
-                <div class="card">
-                    <h3>Quick Items</h3>
-                    ${topItems.map(item => `<button onclick="quickAdd('${item.id}') " title="${item.name} - ₹${item.price}">${item.name}</button>`).join('')}
-                </div>
-                <div class="card">
-                    <h3>Active Orders</h3>
-                    <div id="active-orders">${renderOrders(orders.filter(o => o.status !== 'Served'))}</div>
-                </div>
-            `;
-        }
-
-        function showAutocomplete(query) {
-            const results = query ? menuItems.filter(item => item.available && item.name.toLowerCase().includes(query.toLowerCase())).slice(0, 5) : [];
-            document.getElementById('autocomplete').innerHTML = results.map(item => `
-                <div onclick="selectItem('${item.id}', '${item.name}')" onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
-                    ${item.name} - ₹${item.price} (${item.category})
-                </div>
-            `).join('');
-        }
-
-        function selectItem(id, name) {
-            document.getElementById('item-search').value = name;
-            document.getElementById('autocomplete').innerHTML = '';
-        }
-
-        function quickAdd(id) {
-            const item = menuItems.find(i => i.id === id);
-            if (item) {
-                currentOrder.items.push({ id: item.id, name: item.name, qty: 1, price: item.price });
-                currentOrder.total += item.price;
-                updateCurrentOrder();
-            }
-        }
-
-        function addItemToOrder() {
-            const input = document.getElementById('item-search').value;
-            const name = input.split(' - ')[0];
-            const item = menuItems.find(i => i.available && i.name === name);
-            if (!item) return alert('Select a valid item');
-            const qty = parseInt(document.getElementById('qty').value) || 1;
-            currentOrder.items.push({ id: item.id, name: item.name, qty, price: item.price });
-            currentOrder.total += qty * item.price;
-            updateCurrentOrder();
-            document.getElementById('item-search').value = '';
-            document.getElementById('qty').value = '1';
-        }
-
-        function updateCurrentOrder() {
-            document.getElementById('current-order-items').innerHTML = currentOrder.items.map((it, idx) => `
-                <p>${it.name} x ${it.qty} = ₹${(it.qty * it.price).toFixed(2)} 
-                    <button onclick="removeItem(${idx})">Remove</button>
-                </p>
-            `).join('');
-            document.getElementById('running-total').textContent = currentOrder.total.toFixed(2);
-        }
-
-        function removeItem(idx) {
-            currentOrder.total -= currentOrder.items[idx].qty * currentOrder.items[idx].price;
-            currentOrder.items.splice(idx, 1);
-            updateCurrentOrder();
-        }
-
-        function placeOrder() {
-            if (!currentOrder.items.length) return alert('Add items to the order');
-            currentOrder.id = Date.now().toString();
-            currentOrder.notes = document.getElementById('notes').value;
-            currentOrder.type = document.getElementById('order-type').value;
-            currentOrder.table = document.getElementById('table').value || 'N/A';
-            db.collection('orders').doc(currentOrder.id).set(currentOrder);
-            currentOrder = { items: [], total: 0, status: 'New', timestamp: new Date().toISOString(), notes: '', type: 'Dine-in', table: '' };
-            updateCurrentOrder();
-            render();
-        }
-
-        function renderOrders(filteredOrders) {
-            return filteredOrders.length ? filteredOrders.map(order => `
-                <div class="card" onclick="event.stopPropagation();">
-                    <h4>Order #${order.id} - ${order.status}</h4>
-                    <p>${new Date(order.timestamp).toLocaleString()}</p>
-                    <p>${order.type} | ${order.table}</p>
-                    <ul>${order.items.map(it => `<li>${it.name} x ${it.qty}</li>`).join('')}</ul>
-                    <p>Total: ₹${order.total.toFixed(2)}</p>
-                    <select onchange="updateStatus('${order.id}', this.value)">
-                        <option value="New" ${order.status === 'New' ? 'selected' : ''}>New</option>
-                        <option value="Preparing" ${order.status === 'Preparing' ? 'selected' : ''}>Preparing</option>
-                        <option value="Ready" ${order.status === 'Ready' ? 'selected' : ''}>Ready</option>
-                        <option value="Served" ${order.status === 'Served' ? 'selected' : ''}>Served</option>
-                    </select>
-                </div>
-            `).join('') : '<p>No orders found.</p>';
-        }
-
-        function updateStatus(id, status) {
-            db.collection('orders').doc(id).update({ status });
-            render();
-        }
-
-        // Manager Views
-        function renderManager() {
-            let html = `<button class="logout-btn" onclick="logout()" aria-label="Logout">Logout</button>` + renderManagerNav();
-            if (currentView === 'manager') currentView = 'orders';
-            html += currentView === 'orders' ? renderManagerOrders() :
-                    currentView === 'history' ? renderHistory() :
-                    currentView === 'analytics' ? renderAnalytics() :
-                    currentView === 'menu' ? renderMenuManagement() :
-                    renderSettings();
-            return html;
-        }
-
-        function renderManagerNav() {
-            const views = ['orders', 'history', 'analytics', 'menu', 'settings'];
-            return `
-                <nav>
-                    ${views.map(view => `
-                        <button class="${currentView === view ? 'active' : ''}" onclick="currentView='${view}'; render();">
-                            ${view.charAt(0).toUpperCase() + view.slice(1)}
-                        </button>
-                    `).join('')}
-                </nav>
-            `;
-        }
-
-        function renderManagerOrders() {
-            const liveOrders = orders.filter(o => o.status !== 'Served').sort((a, b) => b.timestamp - a.timestamp);
-            return `
-                <h2>Live Orders</h2>
-                ${renderOrders(liveOrders)}
-            `;
-        }
-
-        function openBillModal(id) {
-            const order = orders.find(o => o.id === id);
-            if (!order) return;
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.innerHTML = `
-                <div class="card">
-                    <h2>Bill #${order.id}</h2>
-                    ${order.items.map((it, idx) => `
-                        <p>
-                            ${it.name} 
-                            <input type="number" value="${it.qty}" min="1" onchange="updateOrderItem('${id}', ${idx}, this.value)" aria-label="Quantity for ${it.name}">
-                            @ ₹${it.price.toFixed(2)} = ₹${(it.qty * it.price).toFixed(2)}
-                            <button onclick="removeOrderItem('${id}', ${idx})">Remove</button>
-                        </p>
-                    `).join('')}
-                    <label>Discount (₹):</label>
-                    <input type="number" id="discount-${id}" value="0" step="0.01" onchange="recalculateOrderTotal('${id}')">
-                    <p>Tax: ${settings.taxRate}%</p>
-                    <p><strong>Total: ₹<span id="total-${id}">${order.total.toFixed(2)}</span></strong></p>
-                    <button onclick="printReceipt('${id}')">Print Receipt</button>
-                    <button onclick="saveOrderChanges('${id}')">Save</button>
-                    <button onclick="this.parentElement.parentElement.remove()">Close</button>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            recalculateOrderTotal(id);
-        }
-
-        function updateOrderItem(orderId, itemIdx, qty) {
-            const order = orders.find(o => o.id === orderId);
-            if (order && order.items[itemIdx]) {
-                order.items[itemIdx].qty = parseInt(qty) || 1;
-                recalculateOrderTotal(orderId);
-            }
-        }
-
-        function removeOrderItem(orderId, itemIdx) {
-            const order = orders.find(o => o.id === orderId);
-            if (order && confirm('Remove item?')) {
-                order.items.splice(itemIdx, 1);
-                recalculateOrderTotal(orderId);
-                openBillModal(orderId);
-            }
-        }
-
-        function recalculateOrderTotal(orderId) {
-            const order = orders.find(o => o.id === orderId);
-            const subtotal = order.items.reduce((sum, it) => sum + it.qty * it.price, 0);
-            const discount = parseFloat(document.getElementById(`discount-${orderId}`).value) || 0;
-            const tax = subtotal * (settings.taxRate / 100);
-            order.total = subtotal - discount + tax;
-            document.getElementById(`total-${orderId}`).textContent = order.total.toFixed(2);
-        }
-
-        function saveOrderChanges(id) {
-            const order = orders.find(o => o.id === id);
-            db.collection('orders').doc(id).set(order);
-            alert('Order updated');
-            document.querySelector('.modal').remove();
-            render();
-        }
-
-        function printReceipt(id) {
-            const order = orders.find(o => o.id === id) || { id: 'TEST', timestamp: new Date().toISOString(), items: [{ name: 'Test Item', qty: 1, price: 100 }], total: 100, type: 'Dine-in', table: 'Test' };
-            const discount = parseFloat(document.getElementById(`discount-${id}`)?.value) || 0;
-            const subtotal = order.items.reduce((sum, it) => sum + it.qty * it.price, 0);
-            const tax = subtotal * (settings.taxRate / 100);
-            const grandTotal = subtotal - discount + tax;
-            const receipt = `
-                <div class="receipt">
-                    <div class="receipt-header">
-                        <h1>${settings.cafeName}</h1>
-                        <p>${settings.contact}</p>
-                        <p>${settings.address}</p>
-                        <p>${settings.catchyLine}</p>
-                    </div>
-                    <p>Order #${order.id}</p>
-                    <p>Date: ${new Date(order.timestamp).toLocaleString()}</p>
-                    <p>Server: ${currentUser || 'Test'}</p>
-                    <p>${order.type} | ${order.table}</p>
-                    <hr>
-                    ${order.items.map(it => `<p>${it.name} x ${it.qty} — ₹${(it.qty * it.price).toFixed(2)}</p>`).join('')}
-                    <hr>
-                    <p>Subtotal: ₹${subtotal.toFixed(2)}</p>
-                    <p>Discount: ₹${discount.toFixed(2)}</p>
-                    <p>Tax (${settings.taxRate}%): ₹${tax.toFixed(2)}</p>
-                    <p class="total">Grand Total: ₹${grandTotal.toFixed(2)}</p>
-                    <div class="receipt-footer">
-                        <p>Thank you! ${settings.catchyLine}</p>
-                        <p>${settings.contact}</p>
-                    </div>
-                </div>
-            `;
-            const printWin = window.open('', '_blank');
-            if (!printWin) {
-                alert('Unable to open print window. Please allow popups for this site and try again.');
-                return;
-            }
-            printWin.document.write(`<html><head><title>Receipt</title><style>@media print { body { width: 80mm; font-size: 10pt; } .receipt h1 { font-size: 12pt; } .receipt .total { font-size: 14pt; font-weight: bold; }}</style></head><body>${receipt}</body></html>`);
-            printWin.document.close();
-            printWin.print();
-            printWin.close();
-        }
-
-        // History
-        function renderHistory() {
-            return `
-                ${renderManagerNav()}
-                <h2>Order History</h2>
-                <label for="history-date">Date:</label>
-                <input type="date" id="history-date" max="${new Date().toISOString().split('T')[0]}" onchange="filterHistory()">
-                <label for="history-search">Search:</label>
-                <input type="text" id="history-search" placeholder="ID, customer, item" oninput="filterHistory()">
-                <div id="history-list">${filterHistory()}</div>
-                <button onclick="exportHistoryCSV()">Export CSV</button>
-            `;
-        }
-
-        function filterHistory() {
-            const date = document.getElementById('history-date')?.value;
-            const search = document.getElementById('history-search')?.value.toLowerCase() || '';
-            const filtered = orders.filter(o => {
-                const matchesDate = !date || new Date(o.timestamp).toDateString() === new Date(date).toDateString();
-                const matchesSearch = !search || 
-                    o.id.toString().includes(search) || 
-                    o.table.toLowerCase().includes(search) || 
-                    o.items.some(it => it.name.toLowerCase().includes(search));
-                return matchesDate && matchesSearch;
-            }).sort((a, b) => b.timestamp - a.timestamp);
-            return filtered.length ? filtered.map(order => `
-                <div class="card" onclick="openBillModal('${order.id}')">
-                    <h4>#${order.id} - ${order.status}</h4>
-                    <p>${new Date(order.timestamp).toLocaleString()}</p>
-                    <p>${order.items.length} items | ₹${order.total.toFixed(2)}</p>
-                    <button onclick="printReceipt('${order.id}'); event.stopPropagation();">Re-Print</button>
-                </div>
-            `).join('') : '<p>No orders found.</p>';
-        }
-
-        function exportHistoryCSV() {
-            const csv = ['ID,Timestamp,Total,Status,Type,Table,Items'];
-            orders.forEach(o => {
-                const items = JSON.stringify(o.items.map(it => `${it.name} x ${it.qty}`)).replace(/"/g, '""');
-                csv.push(`${o.id},${o.timestamp},${o.total.toFixed(2)},${o.status},${o.type},${o.table},"${items}"`);
-            });
-            const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'bloom-orders.csv';
-            a.click();
-        }
-
-        // Analytics
-        function renderAnalytics() {
-            return `
-                ${renderManagerNav()}
-                <h2>Analytics</h2>
-                <label for="start-date">Start Date:</label>
-                <input type="date" id="start-date" max="${new Date().toISOString().split('T')[0]}" onchange="updateAnalytics()">
-                <label for="end-date">End Date:</label>
-                <input type="date" id="end-date" max="${new Date().toISOString().split('T')[0]}" onchange="updateAnalytics()">
-                <div class="card">
-                    <h3>Top Items</h3>
-                    <canvas id="top-items-chart"></canvas>
-                </div>
-                <div class="card">
-                    <h3>Revenue Trend</h3>
-                    <canvas id="revenue-trend-chart"></canvas>
-                </div>
-                <div class="card">
-                    <h3>Category Breakdown</h3>
-                    <canvas id="category-breakdown-chart"></canvas>
-                </div>
-                <button onclick="exportAnalyticsCSV()">Export CSV</button>
-            `;
-        }
-
-        function updateAnalytics() {
-            const start = new Date(document.getElementById('start-date')?.value || '2000-01-01');
-            const end = new Date(document.getElementById('end-date')?.value || new Date());
-            const filtered = orders.filter(o => new Date(o.timestamp) >= start && new Date(o.timestamp) <= end);
-
-            // Top Items
-            const itemCounts = {};
-            filtered.forEach(o => o.items.forEach(it => {
-                itemCounts[it.name] = (itemCounts[it.name] || { count: 0, revenue: 0 });
-                itemCounts[it.name].count += it.qty;
-                itemCounts[it.name].revenue += it.qty * it.price;
-            }));
-            const topItems = Object.entries(itemCounts).sort((a, b) => b[1].count - a[1].count).slice(0, 5);
-            const topItemsChart = document.getElementById('top-items-chart').getContext('2d');
-            new Chart(topItemsChart, {
-                type: 'bar',
-                data: {
-                    labels: topItems.map(([name]) => name),
-                    datasets: [{ label: 'Items Sold', data: topItems.map(([, data]) => data.count), backgroundColor: '#228b22' }]
-                },
-                options: { responsive: true, plugins: { legend: { display: false } } }
-            });
-
-            // Revenue Trend
-            const days = {};
-            filtered.forEach(o => {
-                const day = new Date(o.timestamp).toDateString();
-                days[day] = (days[day] || 0) + o.total;
-            });
-            const revenueChart = document.getElementById('revenue-trend-chart').getContext('2d');
-            new Chart(revenueChart, {
-                type: 'line',
-                data: {
-                    labels: Object.keys(days),
-                    datasets: [{ label: 'Revenue', data: Object.values(days), borderColor: '#228b22', fill: false }]
-                },
-                options: { responsive: true }
-            });
-
-            // Category Breakdown
-            const categories = {};
-            filtered.forEach(o => o.items.forEach(it => {
-                const cat = menuItems.find(m => m.id === it.id)?.category || 'Unknown';
-                categories[cat] = (categories[cat] || 0) + it.qty * it.price;
-            }));
-            const categoryChart = document.getElementById('category-breakdown-chart').getContext('2d');
-            new Chart(categoryChart, {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(categories),
-                    datasets: [{ data: Object.values(categories), backgroundColor: ['#228b22', '#8b4513', '#ffcc00', '#ff6666', '#66ccff'] }]
-                },
-                options: { responsive: true }
-            });
-        }
-
-        function exportAnalyticsCSV() {
-            const start = new Date(document.getElementById('start-date')?.value || '2000-01-01');
-            const end = new Date(document.getElementById('end-date')?.value || new Date());
-            const filtered = orders.filter(o => new Date(o.timestamp) >= start && new Date(o.timestamp) <= end);
-            const itemCounts = {};
-            filtered.forEach(o => o.items.forEach(it => {
-                itemCounts[it.name] = (itemCounts[it.name] || { count: 0, revenue: 0 });
-                itemCounts[it.name].count += it.qty;
-                itemCounts[it.name].revenue += it.qty * it.price;
-            }));
-            const csv = ['Item,Count,Revenue'];
-            Object.entries(itemCounts).forEach(([name, data]) => {
-                csv.push(`${name},${data.count},${data.revenue.toFixed(2)}`);
-            });
-            const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'bloom-analytics.csv';
-            a.click();
-        }
-
-        // Menu Management
-        function renderMenuManagement() {
-            return `
-                ${renderManagerNav()}
-                <h2>Menu Management</h2>
-                ${menuItems.map(item => `
-                    <div class="card">
-                        <label>Name:</label>
-                        <input value="${item.name}" onchange="updateMenuItem('${item.id}', 'name', this.value)">
-                        <label>Category:</label>
-                        <input value="${item.category}" onchange="updateMenuItem('${item.id}', 'category', this.value)">
-                        <label>Price (₹):</label>
-                        <input type="number" value="${item.price}" step="0.01" onchange="updateMenuItem('${item.id}', 'price', this.value)">
-                        <label>Description:</label>
-                        <input value="${item.description}" onchange="updateMenuItem('${item.id}', 'description', this.value)">
-                        <label>Available:</label>
-                        <input type="checkbox" ${item.available ? 'checked' : ''} onchange="updateMenuItem('${item.id}', 'available', this.checked)">
-                        <button onclick="removeMenuItem('${item.id}')">Remove</button>
-                    </div>
-                `).join('')}
-                <button onclick="addMenuItem()">Add Item</button>
-                <label>Import Menu:</label>
-                <input type="file" id="import-menu" accept=".csv" onchange="importMenu()">
-            `;
-        }
-
-        function updateMenuItem(id, field, value) {
-            const item = menuItems.find(i => i.id === id);
-            if (item) {
-                item[field] = field === 'price' ? parseFloat(value) || 0 : field === 'available' ? value : value;
-                db.collection('menu').doc(id).set(item);
-            }
-        }
-
-        function removeMenuItem(id) {
-            if (confirm('Remove item?')) {
-                db.collection('menu').doc(id).delete();
-                menuItems = menuItems.filter(i => i.id !== id);
-                render();
-            }
-        }
-
-        function addMenuItem() {
-            const newId = Date.now().toString();
-            const newItem = { id: newId, category: '', name: 'New Item', price: 0, description: '', available: true, imageUrl: '' };
-            menuItems.push(newItem);
-            db.collection('menu').doc(newId).set(newItem);
-            render();
-        }
-
-        function importMenu() {
-            const file = document.getElementById('import-menu').files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = e => {
-                const lines = e.target.result.split('\n').slice(1).filter(line => line.trim());
-                const newItems = lines.map((line, idx) => {
-                    const [category, name, price] = line.split(',');
-                    const newId = Date.now() + idx + '';
-                    const item = {
-                        id: newId,
-                        category: category.trim(),
-                        name: name.trim(),
-                        price: parseFloat(price) || 0,
-                        description: '',
-                        available: true,
-                        imageUrl: ''
-                    };
-                    db.collection('menu').doc(newId).set(item);
-                    return item;
-                });
-                menuItems = [...menuItems, ...newItems];
-                render();
-            };
-            reader.readAsText(file);
-        }
-
-        // Settings
-        function renderSettings() {
-            return `
-                ${renderManagerNav()}
-                <h2>Settings</h2>
-                <div class="card">
-                    <label>Cafe Name:</label>
-                    <input value="${settings.cafeName}" onchange="settings.cafeName = this.value; saveSettings();">
-                    <label>Contact:</label>
-                    <input value="${settings.contact}" onchange="settings.contact = this.value; saveSettings();">
-                    <label>Address:</label>
-                    <input value="${settings.address}" onchange="settings.address = this.value; saveSettings();">
-                    <label>Catchy Line:</label>
-                    <input value="${settings.catchyLine}" onchange="settings.catchyLine = this.value; saveSettings();">
-                    <label>Tax Rate (%):</label>
-                    <input type="number" value="${settings.taxRate}" step="0.01" onchange="settings.taxRate = parseFloat(this.value) || 0; saveSettings();">
-                    <h3>Passwords</h3>
-                    <label>Manager Password:</label>
-                    <input value="${settings.passwords.manager}" onchange="settings.passwords.manager = this.value; saveSettings();">
-                    <label>Kitchen Password:</label>
-                    <input value="${settings.passwords.kitchen}" onchange="settings.passwords.kitchen = this.value; saveSettings();">
-                    <p style="color: red;">Warning: Plaintext passwords for prototype. Secure in production.</p>
-                    <button onclick="testPrint()">Test Print</button>
-                </div>
-            `;
-        }
-
-        function testPrint() {
-            printReceipt('TEST');
-        }
-
-        // Main Render
-        function render() {
-            const app = document.getElementById('app');
-            app.innerHTML = '';
-            if (!currentUser) {
-                app.innerHTML = renderLogin();
-            } else if (currentUser === 'kitchen') {
-                app.innerHTML = renderKitchen();
-                updateCurrentOrder();
-            } else {
-                app.innerHTML = renderManager();
-                if (currentView === 'analytics') setTimeout(updateAnalytics, 0);
-                if (currentView === 'history') setTimeout(filterHistory, 0);
-            }
-            // Attach click handlers for order cards
-            document.querySelectorAll('.card:not(.modal .card)').forEach(card => {
-                const idMatch = card.querySelector('h4')?.textContent.match(/#(\d+)/);
-                if (idMatch) {
-                    card.onclick = () => openBillModal(idMatch[1]);
-                }
-            });
-        }
-
-        // Handle Firebase offline
-        firebase.database().goOffline();  // Not applicable for Firestore; use Firestore offline persistence if needed
-        firebase.firestore().enableNetwork().then(() => {
-            document.getElementById('realtime-status').textContent = 'Realtime: connected';
-        }).catch(() => {
-            document.getElementById('realtime-status').textContent = 'Realtime: offline (local mode)';
-            alert('Offline: Changes may not sync across devices until reconnected.');
+            menuList.appendChild(div);
         });
+    });
+}
 
-        initializeData();
-        render();
-    </script>
+// Delete Menu Item
+function deleteItem(id) {
+    db.collection('menu').doc(id).delete().then(() => loadMenuItems());
+}
+
+// Kitchen: Load Orders
+function loadOrders() {
+    const orderList = document.getElementById('orderList');
+    orderList.innerHTML = '';
+    db.collection('orders').orderBy('timestamp', 'desc').get().then(snapshot => {
+        snapshot.forEach(doc => {
+            const order = doc.data();
+            const div = document.createElement('div');
+            div.classList.add('order-item');
+            div.innerHTML = `
+                <span>${order.itemName} - ${order.status}</span>
+                <button onclick="updateStatus('${doc.id}', '${order.status}')">Next Status</button>
+            `;
+            orderList.appendChild(div);
+        });
+    });
+}
+
+// Update Order Status
+function updateStatus(id, currentStatus) {
+    let newStatus = '';
+    if(currentStatus === 'pending') newStatus = 'preparing';
+    else if(currentStatus === 'preparing') newStatus = 'ready';
+    else newStatus = 'completed';
+
+    db.collection('orders').doc(id).update({ status: newStatus })
+    .then(() => loadOrders());
+}
+</script>
+
 </body>
 </html>
