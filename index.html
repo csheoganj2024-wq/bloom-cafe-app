@@ -59,18 +59,19 @@
     </footer>
 
     <script>
-        // Firebase Configuration (Replace with your full config from Firebase Console)
-        const firebaseConfig = {
-    apiKey: "AIzaSyCY_PYp0VxGmm4d9OuKRqDRkp-ZCOMLRjU",
-    authDomain: "bloom-cafe-7d929.firebaseapp.com",
-    projectId: "bloom-cafe-7d929",
-    storageBucket: "bloom-cafe-7d929.firebasestorage.app",
-    messagingSenderId: "35820544683",
-    appId: "1:35820544683:web:e26dcea6301e4c9a9e8dee",
-    measurementId: "G-JP1R587JCC"
-  };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+       // Firebase Configuration
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",  // Replace with your actual apiKey
+  authDomain: "bloom-cafe-7d929.firebaseapp.com",
+  projectId: "bloom-cafe-7d929",
+  storageBucket: "bloom-cafe-7d929.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",  // Replace with your sender ID
+  appId: "YOUR_APP_ID"  // Replace with your appId
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
         // Data Models
         let menuItems = [];
